@@ -3,9 +3,37 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 22})
-
 from prophet import Prophet
+
+from fbprophet.diagnostics import cross_validation
+from fbprophet.diagnostics import performance_metrics
+
 import kaggle
+
+import mlflow
+import mlflow.pyfunc
+
+# Here we are defining a small wrapper class that inherits from our MLflow import
+
+class FbProphetWrapper(mlflow.pyfunc.PythonModel):
+    def __init__(self, model):
+        self.model = model
+        super().__init__()
+
+    def load_context(self, context):
+        from fbprophet import Prophet
+
+        return
+
+    def predict(self, context, model_input):
+        future = self.model.make_future_dataframe(periods=model_input["periods"][0])
+        return self.model.predict(future)
+
+seasonality = {
+    'yearly': True,
+    'weekly': True,
+    'daily': True
+}
 
 def download_kaggle_dataset(kaggle_dataset: str ="pratyushakar/rossmann-store-sales") -> None:
     api = kaggle.api
@@ -104,6 +132,10 @@ def plot_forecast(df_train: pd.DataFrame, df_test: pd.DataFrame, predicted: pd.D
     )
     
     try:
+
+        # Replace NaN values in 'yhat_upper' and 'yhat_lower' with finite values 
+        yhat_upper = np.nan_to_num(predicted['yhat_upper'], nan=0.0)
+        yhat_lower = np.nan_to_num(predicted['yhat_lower'], nan=0.0)        
         # Print lengths and first few values to debug
         # print(f"Length of predicted['ds']: {len(predicted['ds'])}")
         # print(f"Length of predicted['yhat_upper']: {len(predicted['yhat_upper'])}")
@@ -113,8 +145,8 @@ def plot_forecast(df_train: pd.DataFrame, df_test: pd.DataFrame, predicted: pd.D
         # print(f"First few values of predicted['yhat_lower']: {predicted['yhat_lower'].head()}")
         ax.fill_between(
             x=predicted['ds'], 
-            y1=predicted['yhat_upper'], 
-            y2=predicted['yhat_lower'], 
+            y1=yhat_upper, 
+            y2=yhat_lower, 
             alpha=0.15, 
             color='red',
         )
@@ -130,7 +162,12 @@ def plot_forecast(df_train: pd.DataFrame, df_test: pd.DataFrame, predicted: pd.D
         alpha=0.5, 
         marker='o'
     )
+    # Get the current y-ticks values
     current_ytick_values = plt.gca().get_yticks()
+
+    # Set the y-ticks explicitly
+    plt.gca().set_yticks(current_ytick_values)
+
     plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_ytick_values])
     ax.set_xlabel('Date')
     ax.set_ylabel('Sales')
@@ -147,7 +184,7 @@ if __name__ == "__main__":
     file_path = './train.csv'
     if os.path.exists(file_path):
         logging.info('Dataset found, reading into pandas dataframe.')
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file_path, low_memory=False)
     else:
         logging.info('Dataset not found, downloading ...')
         download_kaggle_dataset()
@@ -178,8 +215,3 @@ if __name__ == "__main__":
     
     # Plot the forecast
     plot_forecast(df_train, df_test, predicted)
-        
-    
-
-
-
