@@ -20,6 +20,8 @@ def test_dataset() -> Union[np.array, np.array]:
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
     return X_test, y_test
 
+
+# Here we are getting a model for the test. The repository for the model is public so we don't need to store any secrets
 @pytest.fixture
 def model() -> sklearn.ensemble._forest.RandomForestClassifier:
     REPO_ID = "electricweegie/mlewp-sklearn-wine"
@@ -27,12 +29,13 @@ def model() -> sklearn.ensemble._forest.RandomForestClassifier:
     model = joblib.load(hf_hub_download(REPO_ID, FILENAME))
     return model
 
-
+# Here we creating the test, that confirms that the predictions fo the model product the correct object types
 def test_model_inference_types(model, test_dataset):
     assert isinstance(model.predict(test_dataset[0]), np.ndarray)
     assert isinstance(test_dataset[0], np.ndarray)
     assert isinstance(test_dataset[1], np.ndarray)
 
+# This is now a test make sure specific requirements in terms of performance are met for the model, while the model is using the test dataset 
 def test_model_performance(model, test_dataset):
     metrics = classification_report(y_true=test_dataset[1], y_pred=model.predict(test_dataset[0]), output_dict=True)
     assert metrics['False']['f1-score'] > 0.95
